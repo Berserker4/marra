@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
-import Calendar from "react-calendar";
-import dayjs from "dayjs";
+import React, { useEffect, useState } from "react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { auth, provider, db } from "./firebase";
 import {
   collection,
   addDoc,
@@ -9,87 +10,62 @@ import {
   doc,
   onSnapshot,
 } from "firebase/firestore";
-import { auth, provider, db } from "./firebase";
-import {
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-} from "firebase/auth";
+import dayjs from "dayjs";
+import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import "./App.css";
 
-function App() {
+const COLORS = ["#4ade80", "#facc15", "#f87171"]; // Verde, Amarillo, Rojo
+
+export default function App() {
   const [user, setUser] = useState(null);
   const [articulos, setArticulos] = useState([]);
-  const [editId, setEditId] = useState(null);
-  const [filtro, setFiltro] = useState("todos");
-  const [busqueda, setBusqueda] = useState("");
-
   const [form, setForm] = useState({
     nombre: "",
     fechaIngreso: "",
     fechaVencimiento: "",
     avisoDias: 0,
   });
-
+  const [editId, setEditId] = useState(null);
+  const [filtro, setFiltro] = useState("todos");
+  const [busqueda, setBusqueda] = useState("");
   const hoy = dayjs().startOf("day");
 
-  useEffect(() => {
-    onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-  }, []);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "articulos"), (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setArticulos(docs);
-    });
-    return unsub;
-  }, []);
+  useEffect(() => onAuthStateChanged(auth, setUser), []);
+  useEffect(
+    () =>
+      onSnapshot(collection(db, "articulos"), (snap) => {
+        const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setArticulos(data);
+      }),
+    []
+  );
 
   const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
-  const estadoArticulo = (vencimiento, avisoDias) => {
-    const fechaVenc = dayjs(vencimiento);
-    if (hoy.isAfter(fechaVenc)) return "vencido";
-    if (hoy.add(avisoDias, "day").isAfter(fechaVenc)) return "por_vencer";
+  const estadoArticulo = (fecha, aviso) => {
+    const venc = dayjs(fecha);
+    if (hoy.isAfter(venc)) return "vencido";
+    if (hoy.add(aviso, "day").isAfter(venc)) return "por_vencer";
     return "vigente";
-  };
-
-  const textoEstado = {
-    vigente: "Vigente ✅",
-    por_vencer: "Por vencer ⚠️",
-    vencido: "Vencido ❌",
-  };
-
-  const badgeEstado = {
-    vigente: "bg-green-200 text-green-800",
-    por_vencer: "bg-yellow-200 text-yellow-800",
-    vencido: "bg-red-200 text-red-800",
   };
 
   const handleAddOrEdit = async () => {
     if (!form.nombre || !form.fechaIngreso || !form.fechaVencimiento) return;
-
     const data = {
       ...form,
       autor: {
+        uid: user.uid,
         nombre: user.displayName,
         email: user.email,
-        uid: user.uid,
       },
     };
-
     if (editId) {
-      const ref = doc(db, "articulos", editId);
-      await updateDoc(ref, data);
+      await updateDoc(doc(db, "articulos", editId), data);
       setEditId(null);
     } else {
       await addDoc(collection(db, "articulos"), data);
     }
-
     setForm({
       nombre: "",
       fechaIngreso: "",
@@ -98,11 +74,8 @@ function App() {
     });
   };
 
-  const handleDelete = async (id) => {
-    if (confirm("¿Eliminar artículo?")) {
-      await deleteDoc(doc(db, "articulos", id));
-    }
-  };
+  const handleDelete = async (id) =>
+    confirm("¿Eliminar?") && deleteDoc(doc(db, "articulos", id));
 
   const handleEdit = (a) => {
     setForm({
@@ -116,24 +89,20 @@ function App() {
 
   const filtrados = articulos.filter((a) => {
     const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
-    const coincideBusqueda = a.nombre
-      .toLowerCase()
-      .includes(busqueda.toLowerCase());
-    return (
-      (filtro === "todos" || filtro === estado) && coincideBusqueda
-    );
+    const coincide = a.nombre.toLowerCase().includes(busqueda.toLowerCase());
+    return (filtro === "todos" || filtro === estado) && coincide;
   });
 
-  const totalStats = {
-    vigente: 0,
-    por_vencer: 0,
-    vencido: 0,
-  };
+  const resumen = { vigente: 0, por_vencer: 0, vencido: 0 };
+  articulos.forEach(
+    (a) => resumen[estadoArticulo(a.fechaVencimiento, a.avisoDias)]++
+  );
 
-  articulos.forEach((a) => {
-    const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
-    totalStats[estado]++;
-  });
+  const pieData = Object.entries(resumen).map(([name, value], i) => ({
+    name,
+    value,
+    fill: COLORS[i],
+  }));
 
   if (!user) {
     return (
@@ -151,53 +120,72 @@ function App() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-2">
-        <div>
-          <h1 className="text-2xl font-bold">MARRA DISTRIBUCIONES</h1>
-          <p className="text-sm text-gray-500">Hola, {user.displayName}</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">
+          Marra Distribuciones
+        </h1>
+        <div className="flex items-center gap-3 mt-3 md:mt-0">
+          <span className="text-gray-600">{user.displayName}</span>
+          <button
+            onClick={logout}
+            className="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded"
+          >
+            Cerrar sesión
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="bg-gray-300 hover:bg-gray-400 px-4 py-2 rounded"
-        >
-          Cerrar sesión
-        </button>
       </div>
 
-      {/* Notificaciones / Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
+      {/* Dashboard + Pie chart */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 text-center">
         <div className="bg-green-100 text-green-700 p-4 rounded-xl shadow">
-          ✅ Vigentes: <strong>{totalStats.vigente}</strong>
+          ✅ Vigentes: <strong>{resumen.vigente}</strong>
         </div>
         <div className="bg-yellow-100 text-yellow-700 p-4 rounded-xl shadow">
-          ⚠️ Por vencer: <strong>{totalStats.por_vencer}</strong>
+          ⚠️ Por vencer: <strong>{resumen.por_vencer}</strong>
         </div>
         <div className="bg-red-100 text-red-700 p-4 rounded-xl shadow">
-          ❌ Vencidos: <strong>{totalStats.vencido}</strong>
+          ❌ Vencidos: <strong>{resumen.vencido}</strong>
         </div>
       </div>
 
-      {/* Filtros y búsqueda */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-2">
+      <div className="bg-white p-6 rounded-xl shadow mb-6">
+        <h3 className="text-center font-semibold mb-2">
+          Distribución de artículos
+        </h3>
+        <ResponsiveContainer width="100%" height={250}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              dataKey="value"
+              nameKey="name"
+              outerRadius={80}
+              label
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.fill} />
+              ))}
+            </Pie>
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Buscador + filtros */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
         <div className="flex gap-2 flex-wrap">
-          {[
-            { label: "Todos", value: "todos" },
-            { label: "Vigentes ✅", value: "vigente" },
-            { label: "Por vencer ⚠️", value: "por_vencer" },
-            { label: "Vencidos ❌", value: "vencido" },
-          ].map((f) => (
+          {["todos", "vigente", "por_vencer", "vencido"].map((f) => (
             <button
-              key={f.value}
-              onClick={() => setFiltro(f.value)}
+              key={f}
+              onClick={() => setFiltro(f)}
               className={`px-3 py-1 rounded-full border ${
-                filtro === f.value
+                filtro === f
                   ? "bg-blue-500 text-white"
                   : "bg-white text-gray-700 hover:bg-blue-100"
               }`}
             >
-              {f.label}
+              {f === "todos" ? "Todos" : f.replace("_", " ")}
             </button>
           ))}
         </div>
@@ -210,9 +198,9 @@ function App() {
         />
       </div>
 
-      {/* Formulario y calendario */}
+      {/* Formulario + calendario */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="border p-6 rounded-2xl shadow bg-white">
+        <div className="bg-white p-6 rounded-2xl shadow">
           <h2 className="text-lg font-semibold mb-4">
             {editId ? "Editar artículo" : "Nuevo artículo"}
           </h2>
@@ -228,21 +216,27 @@ function App() {
             type="date"
             className="w-full border rounded mb-3 p-2"
             value={form.fechaIngreso}
-            onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, fechaIngreso: e.target.value })
+            }
           />
           <label className="block mb-1">Fecha de vencimiento</label>
           <input
             type="date"
             className="w-full border rounded mb-3 p-2"
             value={form.fechaVencimiento}
-            onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, fechaVencimiento: e.target.value })
+            }
           />
           <label className="block mb-1">Avisar X días antes</label>
           <input
             type="number"
             className="w-full border rounded mb-4 p-2"
             value={form.avisoDias}
-            onChange={(e) => setForm({ ...form, avisoDias: Number(e.target.value) })}
+            onChange={(e) =>
+              setForm({ ...form, avisoDias: Number(e.target.value) })
+            }
           />
           <button
             onClick={handleAddOrEdit}
@@ -251,17 +245,16 @@ function App() {
             {editId ? "Guardar cambios" : "Agregar artículo"}
           </button>
         </div>
-
-        <div className="border p-6 rounded-2xl shadow bg-white">
+        <div className="bg-white p-6 rounded-2xl shadow">
           <Calendar value={new Date()} />
         </div>
       </div>
 
       {/* Tabla */}
-      <div className="overflow-x-auto rounded-xl shadow bg-white">
-        <table className="w-full text-left border border-gray-200">
-          <thead>
-            <tr className="bg-gray-100">
+      <div className="overflow-x-auto bg-white rounded-xl shadow">
+        <table className="w-full text-left border">
+          <thead className="bg-gray-100">
+            <tr>
               <th className="p-3">Nombre</th>
               <th className="p-3">Ingreso</th>
               <th className="p-3">Vencimiento</th>
@@ -280,12 +273,8 @@ function App() {
                   <td className="p-3">{a.fechaIngreso}</td>
                   <td className="p-3">{a.fechaVencimiento}</td>
                   <td className="p-3">{a.avisoDias} días</td>
-                  <td className="p-3">
-                    <span
-                      className={`text-sm px-2 py-1 rounded-full ${badgeEstado[estado]}`}
-                    >
-                      {textoEstado[estado]}
-                    </span>
+                  <td className="p-3 capitalize">
+                    {estado.replace("_", " ")}
                   </td>
                   <td className="p-3 text-sm text-gray-600">
                     {a.autor?.nombre || "—"}
@@ -320,5 +309,3 @@ function App() {
     </div>
   );
 }
-
-export default App;
