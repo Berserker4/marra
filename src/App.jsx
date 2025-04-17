@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Calendar from "react-calendar";
 import dayjs from "dayjs";
-import { db } from "./firebase";
 import {
   collection,
   addDoc,
@@ -10,10 +9,17 @@ import {
   doc,
   onSnapshot,
 } from "firebase/firestore";
+import { auth, provider, db } from "./firebase";
+import {
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
 import "react-calendar/dist/Calendar.css";
 import "./App.css";
 
 function App() {
+  const [user, setUser] = useState(null);
   const [articulos, setArticulos] = useState([]);
   const [editId, setEditId] = useState(null);
   const [filtro, setFiltro] = useState("todos");
@@ -28,12 +34,21 @@ function App() {
   const hoy = dayjs().startOf("day");
 
   useEffect(() => {
+    onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+  }, []);
+
+  useEffect(() => {
     const unsub = onSnapshot(collection(db, "articulos"), (snapshot) => {
       const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setArticulos(docs);
     });
     return unsub;
   }, []);
+
+  const login = () => signInWithPopup(auth, provider);
+  const logout = () => signOut(auth);
 
   const estadoArticulo = (vencimiento, avisoDias) => {
     const fechaVenc = dayjs(vencimiento);
@@ -74,7 +89,7 @@ function App() {
   };
 
   const handleDelete = async (id) => {
-    if (confirm("¿Seguro que querés eliminar este artículo?")) {
+    if (confirm("¿Eliminar artículo?")) {
       await deleteDoc(doc(db, "articulos", id));
     }
   };
@@ -94,11 +109,37 @@ function App() {
     return filtro === "todos" || filtro === estado;
   });
 
+  // 👉 Si NO está logueado
+  if (!user) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-100 text-center">
+        <h1 className="text-3xl font-bold mb-4">Marra Distribuciones</h1>
+        <p className="mb-4 text-gray-600">Iniciá sesión para continuar</p>
+        <button
+          onClick={login}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          Iniciar sesión con Google
+        </button>
+      </div>
+    );
+  }
+
+  // 👉 Si está logueado
   return (
     <div className="p-6 max-w-5xl mx-auto font-sans">
-      <h1 className="text-center text-3xl font-bold mb-6 text-gray-800">
-        MARRA DISTRIBUCIONES
-      </h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">MARRA DISTRIBUCIONES</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-700">{user.displayName}</span>
+          <button
+            onClick={logout}
+            className="bg-gray-300 hover:bg-gray-400 px-3 py-1 rounded"
+          >
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="border p-6 rounded-2xl shadow bg-white">
