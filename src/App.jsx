@@ -200,6 +200,3 @@ export default function App() {
     </div>
   );
 }
-
-
-//nashe
