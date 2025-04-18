@@ -1,3 +1,113 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Fondo general y texto claro */
+body {
+  @apply bg-[#1E1E2F] text-[#F5F5F5] font-sans;
+}
+
+/* Botones primarios */
+button {
+  @apply transition duration-200 ease-in-out;
+}
+
+/* Inputs y selects */
+input[type="text"],
+input[type="date"],
+input[type="number"],
+input[type="search"],
+select,
+textarea {
+  @apply bg-[#2A2A3D] border border-[#3A3A4F] text-white placeholder-gray-400 rounded px-3 py-2 w-full;
+}
+
+/* Botones dentro de filtros o formularios */
+button.bg-blue-500,
+button.bg-black,
+button.bg-gray-300,
+button.bg-yellow-300,
+button.bg-red-500 {
+  @apply rounded-lg text-white px-4 py-2;
+}
+
+button.bg-blue-500:hover {
+  @apply bg-blue-600;
+}
+
+button.bg-black:hover {
+  @apply bg-gray-800;
+}
+
+button.bg-gray-300 {
+  @apply bg-[#3A3A4F];
+}
+
+button.bg-gray-300:hover {
+  @apply bg-[#4A4A5F];
+}
+
+button.bg-yellow-300 {
+  @apply text-black;
+}
+
+button.bg-yellow-300:hover {
+  @apply bg-yellow-400;
+}
+
+button.bg-red-500:hover {
+  @apply bg-red-600;
+}
+
+/* Cards / Paneles */
+.card-dark {
+  @apply bg-[#2A2A3D] p-6 rounded-2xl shadow-lg shadow-black/20;
+}
+
+/* Tabla */
+table {
+  @apply w-full border border-[#3A3A4F] text-sm;
+}
+
+thead {
+  @apply bg-[#1E1E2F] text-gray-300;
+}
+
+thead th {
+  @apply p-3 text-left border-b border-[#3A3A4F];
+}
+
+tbody td {
+  @apply p-3 border-t border-[#3A3A4F];
+}
+
+tbody tr:hover {
+  @apply bg-[#262637];
+}
+
+/* Badges de estado */
+.badge-vigente {
+  @apply bg-green-500/20 text-green-300 px-2 py-1 rounded-full text-sm;
+}
+
+.badge-por_vencer {
+  @apply bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded-full text-sm;
+}
+
+.badge-vencido {
+  @apply bg-red-500/20 text-red-300 px-2 py-1 rounded-full text-sm;
+}
+
+/* Placeholder en inputs */
+::placeholder {
+  @apply text-gray-400;
+}
+
+/* Scrollbar opcional */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #3A3A4F;
+  border-radius: 4px;
+}
