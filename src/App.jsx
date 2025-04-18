@@ -10,7 +10,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { Calendar } from "react-day-picker";
-import "react-day-picker/dist/style.css";
+import 'react-day-picker/style.css';
 import "./App.css";
 
 function App() {
