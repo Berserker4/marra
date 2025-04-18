@@ -1,90 +1,181 @@
-import { useEffect, useState } from "react";
-import { db } from "./firebase";
-import { collection, getDocs } from "firebase/firestore";
+import React, { useState, useEffect } from "react";
 import Calendar from "react-calendar";
+import dayjs from "dayjs";
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  onSnapshot,
+} from "firebase/firestore";
+import { auth, provider, db } from "./firebase";
+import {
+  signInWithPopup,
+  signOut,
+  onAuthStateChanged,
+} from "firebase/auth";
 import "react-calendar/dist/Calendar.css";
 import "./App.css";
 
 function App() {
+  const [user, setUser] = useState(null);
   const [articulos, setArticulos] = useState([]);
+  const [editId, setEditId] = useState(null);
   const [filtro, setFiltro] = useState("todos");
-  const [filtroNombre, setFiltroNombre] = useState("");
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
+  const [busqueda, setBusqueda] = useState("");
+
+  const [form, setForm] = useState({
+    nombre: "",
+    fechaIngreso: "",
+    fechaVencimiento: "",
+    avisoDias: 0,
+  });
+
+  const hoy = dayjs().startOf("day");
 
   useEffect(() => {
-    const obtenerArticulos = async () => {
-      const articulosSnapshot = await getDocs(collection(db, "articulos"));
-      const articulosData = articulosSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setArticulos(articulosData);
-    };
-
-    obtenerArticulos();
+    onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
   }, []);
 
-  const filtrarArticulos = (articulo) => {
-    const nombreCoincide = articulo.nombre
-      .toLowerCase()
-      .includes(filtroNombre.toLowerCase());
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "articulos"), (snapshot) => {
+      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setArticulos(docs);
+    });
+    return unsub;
+  }, []);
 
-    const hoy = new Date();
-    const fechaVencimiento = new Date(articulo.vencimiento);
-    const diferenciaDias = Math.ceil(
-      (fechaVencimiento - hoy) / (1000 * 60 * 60 * 24)
-    );
+  const login = () => signInWithPopup(auth, provider);
+  const logout = () => signOut(auth);
 
-    if (!nombreCoincide) return false;
-
-    switch (filtro) {
-      case "vigente":
-        return diferenciaDias > 30;
-      case "por_vencer":
-        return diferenciaDias <= 30 && diferenciaDias >= 0;
-      case "vencido":
-        return diferenciaDias < 0;
-      default:
-        return true;
-    }
+  const estadoArticulo = (vencimiento, avisoDias) => {
+    const fechaVenc = dayjs(vencimiento);
+    if (hoy.isAfter(fechaVenc)) return "vencido";
+    if (hoy.add(avisoDias, "day").isAfter(fechaVenc)) return "por_vencer";
+    return "vigente";
   };
 
-  const obtenerBadge = (vencimiento) => {
-    const hoy = new Date();
-    const fechaVencimiento = new Date(vencimiento);
-    const diferenciaDias = Math.ceil(
-      (fechaVencimiento - hoy) / (1000 * 60 * 60 * 24)
-    );
+  const textoEstado = {
+    vigente: "Vigente ✅",
+    por_vencer: "Por vencer ⚠️",
+    vencido: "Vencido ❌",
+  };
 
-    if (diferenciaDias > 30) {
-      return <span className="badge-vigente">Vigente</span>;
-    } else if (diferenciaDias <= 30 && diferenciaDias >= 0) {
-      return <span className="badge-por_vencer">Por vencer</span>;
+  const badgeEstado = {
+    vigente: "bg-green-600 text-white",
+    por_vencer: "bg-yellow-500 text-black",
+    vencido: "bg-red-600 text-white",
+  };
+
+  const handleAddOrEdit = async () => {
+    if (!form.nombre || !form.fechaIngreso || !form.fechaVencimiento) return;
+
+    const data = {
+      ...form,
+      autor: {
+        nombre: user.displayName,
+        email: user.email,
+        uid: user.uid,
+      },
+    };
+
+    if (editId) {
+      const ref = doc(db, "articulos", editId);
+      await updateDoc(ref, data);
+      setEditId(null);
     } else {
-      return <span className="badge-vencido">Vencido</span>;
+      await addDoc(collection(db, "articulos"), data);
+    }
+
+    setForm({
+      nombre: "",
+      fechaIngreso: "",
+      fechaVencimiento: "",
+      avisoDias: 0,
+    });
+  };
+
+  const handleDelete = async (id) => {
+    if (confirm("¿Eliminar artículo?")) {
+      await deleteDoc(doc(db, "articulos", id));
     }
   };
+
+  const handleEdit = (a) => {
+    setForm({
+      nombre: a.nombre,
+      fechaIngreso: a.fechaIngreso,
+      fechaVencimiento: a.fechaVencimiento,
+      avisoDias: a.avisoDias,
+    });
+    setEditId(a.id);
+  };
+
+  const filtrados = articulos.filter((a) => {
+    const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
+    const coincideBusqueda = a.nombre
+      .toLowerCase()
+      .includes(busqueda.toLowerCase());
+    return (
+      (filtro === "todos" || filtro === estado) && coincideBusqueda
+    );
+  });
+
+  const totalStats = {
+    vigente: 0,
+    por_vencer: 0,
+    vencido: 0,
+  };
+
+  articulos.forEach((a) => {
+    const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
+    totalStats[estado]++;
+  });
+
+  if (!user) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-[#1E1E2F] text-center text-white">
+        <h1 className="text-3xl font-bold mb-4">Marra Distribuciones</h1>
+        <p className="mb-4 text-gray-400">Iniciá sesión para continuar</p>
+        <button
+          onClick={login}
+          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+        >
+          Iniciar sesión con Google
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen p-6">
-      <h1 className="text-3xl font-bold mb-6 text-center">MARRA</h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-        <div className="card-dark">
-          <h2 className="text-xl font-semibold mb-4">Calendario</h2>
-          <Calendar
-            value={fechaSeleccionada}
-            onChange={setFechaSeleccionada}
-            className="bg-[#2A2A3D] text-white rounded-xl p-4"
-            tileClassName="text-white"
-            calendarType="US"
-          />
+    <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans text-white">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">MARRA DISTRIBUCIONES</h1>
+          <p className="text-sm text-gray-400">Hola, {user.displayName}</p>
         </div>
+        <button
+          onClick={logout}
+          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-white"
+        >
+          Cerrar sesión
+        </button>
       </div>
 
-      {/* Filtros */}
-      <div className="mb-4">
-        <div className="flex gap-2 flex-wrap mb-4">
+      {/* Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 text-center">
+        <div className="bg-green-800 text-white p-4 rounded-xl shadow">✅ Vigentes: <strong>{totalStats.vigente}</strong></div>
+        <div className="bg-yellow-600 text-black p-4 rounded-xl shadow">⚠️ Por vencer: <strong>{totalStats.por_vencer}</strong></div>
+        <div className="bg-red-800 text-white p-4 rounded-xl shadow">❌ Vencidos: <strong>{totalStats.vencido}</strong></div>
+      </div>
+
+      {/* Filtros y búsqueda */}
+      <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
+        <div className="flex gap-2 flex-wrap">
           {[
             { label: "Todos", value: "todos" },
             { label: "Vigentes ✅", value: "vigente" },
@@ -94,45 +185,126 @@ function App() {
             <button
               key={f.value}
               onClick={() => setFiltro(f.value)}
-              className={`px-4 py-1.5 rounded-full border text-sm transition duration-200 ${
+              className={`px-3 py-1 rounded-full border ${
                 filtro === f.value
-                  ? "bg-blue-600 border-blue-600 text-white"
-                  : "bg-[#1E1E2F] border-gray-500 text-gray-300 hover:bg-[#2A2A3D] hover:border-gray-400"
+                  ? "bg-blue-500 text-white"
+                  : "bg-[#2A2A3D] text-white border-gray-600 hover:bg-[#3A3A50]"
               }`}
             >
               {f.label}
             </button>
           ))}
         </div>
-
-        {/* Buscador de nombres */}
-        <input
-          type="text"
-          placeholder="Buscar por nombre..."
-          className="mb-4"
-          value={filtroNombre}
-          onChange={(e) => setFiltroNombre(e.target.value)}
-        />
+        <div className="flex flex-col items-end w-full md:w-auto">
+          <label className="text-sm text-gray-400 mb-1">Buscar por nombre</label>
+          <input
+            type="text"
+            placeholder="Ej: Coca Cola..."
+            className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded w-full md:w-64"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </div>
       </div>
 
-      {/* Tabla de artículos */}
-      <div className="overflow-x-auto">
-        <table>
+      {/* Formulario */}
+      <div className="border p-6 rounded-2xl shadow bg-[#2A2A3D] mb-6">
+        <h2 className="text-lg font-semibold mb-4">
+          {editId ? "Editar artículo" : "Nuevo artículo"}
+        </h2>
+        <label className="block mb-1">Nombre</label>
+        <input
+          type="text"
+          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-3 p-2 text-white"
+          value={form.nombre}
+          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+        />
+        <label className="block mb-1">Fecha de ingreso</label>
+        <input
+          type="date"
+          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-3 p-2 text-white"
+          value={form.fechaIngreso}
+          onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
+        />
+        <label className="block mb-1">Fecha de vencimiento</label>
+        <input
+          type="date"
+          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-3 p-2 text-white"
+          value={form.fechaVencimiento}
+          onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })}
+        />
+        <label className="block mb-1">Avisar X días antes</label>
+        <input
+          type="number"
+          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-4 p-2 text-white"
+          value={form.avisoDias}
+          onChange={(e) => setForm({ ...form, avisoDias: Number(e.target.value) })}
+        />
+        <button
+          onClick={handleAddOrEdit}
+          className="bg-blue-600 hover:bg-blue-700 text-white w-full py-2 rounded-xl transition"
+        >
+          {editId ? "Guardar cambios" : "Agregar artículo"}
+        </button>
+      </div>
+
+      {/* Tabla */}
+      <div className="overflow-x-auto rounded-xl shadow bg-[#2A2A3D]">
+        <table className="w-full text-left">
           <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Vencimiento</th>
-              <th>Estado</th>
+            <tr className="bg-[#3A3A50] text-gray-300">
+              <th className="p-3">Nombre</th>
+              <th className="p-3">Ingreso</th>
+              <th className="p-3">Vencimiento</th>
+              <th className="p-3">Aviso</th>
+              <th className="p-3">Estado</th>
+              <th className="p-3">Autor</th>
+              <th className="p-3">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {articulos.filter(filtrarArticulos).map((articulo) => (
-              <tr key={articulo.id}>
-                <td>{articulo.nombre}</td>
-                <td>{new Date(articulo.vencimiento).toLocaleDateString()}</td>
-                <td>{obtenerBadge(articulo.vencimiento)}</td>
+            {filtrados.map((a) => {
+              const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
+              return (
+                <tr key={a.id} className="border-t border-gray-700">
+                  <td className="p-3">{a.nombre}</td>
+                  <td className="p-3">{a.fechaIngreso}</td>
+                  <td className="p-3">{a.fechaVencimiento}</td>
+                  <td className="p-3">{a.avisoDias} días</td>
+                  <td className="p-3">
+                    <span
+                      className={`text-sm px-2 py-1 rounded-full ${badgeEstado[estado]}`}
+                    >
+                      {textoEstado[estado]}
+                    </span>
+                  </td>
+                  <td className="p-3 text-sm text-gray-400">
+                    {a.autor?.nombre || "—"}
+                  </td>
+                  <td className="p-3 space-x-2">
+                    <button
+                      onClick={() => handleEdit(a)}
+                      className="px-2 py-1 bg-yellow-400 hover:bg-yellow-500 text-black rounded"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDelete(a.id)}
+                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                    >
+                      🗑️
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtrados.length === 0 && (
+              <tr>
+                <td colSpan="7" className="text-center p-4 text-gray-500">
+                  No hay artículos.
+                </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </div>
