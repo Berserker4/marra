@@ -108,7 +108,7 @@ function App() {
 
   if (!user) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#1E1E2F] text-white">
+      <div className="h-screen flex flex-col items-center justify-center bg-[#282c34] text-white">
         <h1 className="text-3xl font-bold mb-4">Marra Distribuciones</h1>
         <button
           onClick={login}
@@ -121,7 +121,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1E1E2F] text-white p-6">
+    <div className="min-h-screen bg-[#282c34] text-white p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Marra Distribuciones</h1>
@@ -145,7 +145,7 @@ function App() {
                    est === "vigente" ? "bg-green-600 border-green-600 text-white" :
                    est === "por_vencer" ? "bg-yellow-500 border-yellow-500 text-black" :
                    "bg-red-600 border-red-600 text-white")
-                : "bg-[#2A2A3D] border-gray-600 text-gray-300 hover:bg-[#3A3A50]"
+                : "bg-[#3a3a3f] border-gray-600 text-gray-300 hover:bg-[#2a2a2a]"
             }`}
           >
             {est === "todos"
@@ -166,13 +166,13 @@ function App() {
           placeholder="Buscar por nombre..."
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          className="bg-[#2A2A3D] border border-gray-600 text-white p-2 rounded w-full md:w-64"
+          className="bg-[#3a3a3f] border border-gray-600 text-white p-2 rounded w-full md:w-64"
         />
       </div>
 
       {/* Formulario y Calendario */}
       <div className="flex flex-col md:flex-row gap-6 mb-6">
-        <div className="flex-1 bg-[#2A2A3D] p-6 rounded-xl shadow-lg">
+        <div className="flex-1 bg-[#2a2a2a] p-6 rounded-xl shadow-lg">
           <h2 className="text-xl font-semibold mb-4">
             {editId ? "Editar artículo" : "Nuevo artículo"}
           </h2>
@@ -181,20 +181,20 @@ function App() {
             placeholder="Nombre"
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="w-full mb-3 p-2 bg-[#1E1E2F] rounded border border-gray-600"
+            className="w-full mb-3 p-2 bg-[#3a3a3f] rounded border border-gray-600"
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <input
               type="date"
               value={form.fechaIngreso}
               onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
-              className="p-2 bg-[#1E1E2F] rounded border border-gray-600"
+              className="p-2 bg-[#3a3a3f] rounded border border-gray-600"
             />
             <input
               type="date"
               value={form.fechaVencimiento}
               onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })}
-              className="p-2 bg-[#1E1E2F] rounded border border-gray-600"
+              className="p-2 bg-[#3a3a3f] rounded border border-gray-600"
             />
           </div>
           <input
@@ -202,7 +202,7 @@ function App() {
             placeholder="Avisar X días antes"
             value={form.avisoDias}
             onChange={(e) => setForm({ ...form, avisoDias: Number(e.target.value) })}
-            className="w-full mb-4 p-2 bg-[#1E1E2F] rounded border border-gray-600"
+            className="w-full mb-4 p-2 bg-[#3a3a3f] rounded border border-gray-600"
           />
           <button
             onClick={handleAddOrEdit}
@@ -211,19 +211,19 @@ function App() {
             {editId ? "Guardar cambios" : "Agregar artículo"}
           </button>
         </div>
-        <div className="bg-[#2A2A3D] p-4 rounded-xl shadow-lg">
+        <div className="bg-[#3a3a3f] p-4 rounded-xl shadow-lg">
           <Calendar
             onChange={setFechaSeleccionada}
             value={fechaSeleccionada}
-            className="border-none rounded-lg bg-[#2A2A3D] text-white"
+            className="border-none rounded-lg bg-[#3a3a3f] text-white"
           />
         </div>
       </div>
 
       {/* Tabla */}
-      <div className="overflow-x-auto bg-[#2A2A3D] rounded-xl shadow-lg">
+      <div className="overflow-x-auto bg-[#2a2a2a] rounded-xl shadow-lg">
         <table className="w-full text-left">
-          <thead className="bg-[#3A3A50] text-gray-300">
+          <thead className="bg-[#3a3a3f] text-gray-300">
             <tr>
               <th className="p-3">Nombre</th>
               <th className="p-3">Ingreso</th>
