@@ -111,3 +111,31 @@ tbody tr:hover {
   background-color: #3A3A4F;
   border-radius: 4px;
 }
+
+/* Estilo oscuro para react-calendar */
+.react-calendar {
+  @apply bg-[#2A2A3D] text-white rounded-2xl p-4 shadow-lg;
+  border: none;
+}
+
+.react-calendar__navigation button {
+  @apply text-white hover:bg-[#3A3A4F] rounded;
+}
+
+.react-calendar__month-view__weekdays {
+  @apply text-gray-400;
+}
+
+.react-calendar__tile {
+  @apply bg-transparent text-white rounded hover:bg-[#3A3A4F];
+}
+
+.react-calendar__tile--now {
+  @apply bg-blue-600 text-white rounded;
+}
+
+.react-calendar__tile--active {
+  @apply bg-blue-500 text-white;
+}
+
+
