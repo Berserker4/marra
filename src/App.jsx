@@ -71,9 +71,7 @@ function App() {
     if (!form.nombre || !form.fechaIngreso || !form.fechaVencimiento) return;
     const data = {
       ...form,
-      autor: {
-        nombre: user.displayName || user.email,
-      },
+      autor: { nombre: user.displayName || user.email },
     };
     if (editId) {
       await updateDoc(doc(db, "articulos", editId), data);
@@ -135,44 +133,10 @@ function App() {
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          { label: "Todos", val: "todos" },
-          { label: "Vigentes ✅", val: "vigente" },
-          { label: "Por vencer ⚠️", val: "por_vencer" },
-          { label: "Vencidos ❌", val: "vencido" },
-        ].map((f) => (
-          <button
-            key={f.val}
-            onClick={() => setFiltro(f.val)}
-            className={`px-4 py-1 rounded-full border ${
-              filtro === f.val
-                ? `bg-blue-600 border-blue-600 text-white`
-                : "bg-[#3a3a3f] border-gray-600 text-gray-300 hover:bg-[#2a2a2a]"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Buscador */}
-      <div className="flex justify-end">
-        <input
-          type="text"
-          placeholder="Buscar por nombre..."
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          className="bg-[#3a3a3f] border border-gray-600 text-white p-2 rounded w-full md:w-64"
-        />
-      </div>
-
       {/* Formulario + Calendario */}
       <div className="flex flex-col md:flex-row gap-6">
-        {/* Formulario */}
-        <div className="flex-1 bg-[#3a3a3f] p-6 rounded-xl shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">
+        <div className="flex-1 bg-[#3a3a3f] p-6 rounded-xl shadow-lg space-y-4">
+          <h2 className="text-xl font-semibold">
             {editId ? "Editar artículo" : "Nuevo artículo"}
           </h2>
           <input
@@ -180,23 +144,19 @@ function App() {
             placeholder="Nombre"
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="w-full mb-3 p-2 bg-[#2a2a2a] rounded border border-gray-600"
+            className="w-full p-2 bg-[#2a2a2a] rounded border border-gray-600"
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="date"
               value={form.fechaIngreso}
-              onChange={(e) =>
-                setForm({ ...form, fechaIngreso: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
               className="p-2 bg-[#2a2a2a] rounded border border-gray-600"
             />
             <input
               type="date"
               value={form.fechaVencimiento}
-              onChange={(e) =>
-                setForm({ ...form, fechaVencimiento: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })}
               className="p-2 bg-[#2a2a2a] rounded border border-gray-600"
             />
           </div>
@@ -204,10 +164,8 @@ function App() {
             type="number"
             placeholder="Avisar X días antes"
             value={form.avisoDias}
-            onChange={(e) =>
-              setForm({ ...form, avisoDias: Number(e.target.value) })
-            }
-            className="w-full mb-4 p-2 bg-[#2a2a2a] rounded border border-gray-600"
+            onChange={(e) => setForm({ ...form, avisoDias: Number(e.target.value) })}
+            className="w-full p-2 bg-[#2a2a2a] rounded border border-gray-600"
           />
           <button
             onClick={handleAddOrEdit}
@@ -216,8 +174,6 @@ function App() {
             {editId ? "Guardar cambios" : "Agregar artículo"}
           </button>
         </div>
-
-        {/* Calendario */}
         <div className="bg-[#3a3a3f] p-4 rounded-xl shadow-lg">
           <Calendar
             onChange={setFechaSeleccionada}
@@ -227,7 +183,38 @@ function App() {
         </div>
       </div>
 
-      {/* Tabla */}
+      {/* Filtros y Buscador - arriba de la tabla */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { label: "Todos", val: "todos" },
+            { label: "Vigentes ✅", val: "vigente" },
+            { label: "Por vencer ⚠️", val: "por_vencer" },
+            { label: "Vencidos ❌", val: "vencido" },
+          ].map((f) => (
+            <button
+              key={f.val}
+              onClick={() => setFiltro(f.val)}
+              className={`px-4 py-1 rounded-full border ${
+                filtro === f.val
+                  ? `bg-blue-600 border-blue-600 text-white`
+                  : "bg-[#3a3a3f] border-gray-600 text-gray-300 hover:bg-[#2a2a2a]"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <input
+          type="text"
+          placeholder="Buscar por nombre..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          className="bg-[#3a3a3f] border border-gray-600 text-white p-2 rounded w-full md:w-64"
+        />
+      </div>
+
+      {/* Tabla de artículos */}
       <div className="overflow-x-auto bg-[#3a3a3f] rounded-xl shadow-lg">
         <table className="w-full text-left">
           <thead className="bg-[#2a2a2a] text-gray-300">
@@ -251,24 +238,12 @@ function App() {
                   <td className="p-3">{a.fechaVencimiento}</td>
                   <td className="p-3">{a.avisoDias} días</td>
                   <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full ${badgeEstado[est]}`}>
-                      {textoEstado[est]}
-                    </span>
+                    <span className={`px-2 py-1 rounded-full ${badgeEstado[est]}`}>{textoEstado[est]}</span>
                   </td>
                   <td className="p-3">{a.autor.nombre}</td>
                   <td className="p-3 space-x-2">
-                    <button
-                      onClick={() => handleEdit(a)}
-                      className="px-2 py-1 bg-yellow-400 rounded hover:bg-yellow-500"
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => handleDelete(a.id)}
-                      className="px-2 py-1 bg-red-600 rounded hover:bg-red-700"
-                    >
-                      🗑️
-                    </button>
+                    <button onClick={() => handleEdit(a)} className="px-2 py-1 bg-yellow-400 rounded hover:bg-yellow-500">✏️</button>
+                    <button onClick={() => handleDelete(a.id)} className="px-2 py-1 bg-red-600 rounded hover:bg-red-700">🗑️</button>
                   </td>
                 </tr>
               );
