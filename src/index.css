@@ -2,140 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fondo general y texto claro */
+/* Modo oscuro base */
 body {
-  @apply bg-[#1E1E2F] text-[#F5F5F5] font-sans;
+  @apply bg-black text-white;
 }
 
-/* Botones primarios */
+/* Estilo para inputs */
+input {
+  @apply bg-neutral-800 text-white border-none rounded p-2 w-full;
+}
+
+/* Estilo para botones */
 button {
-  @apply transition duration-200 ease-in-out;
+  @apply text-white font-medium rounded transition-all duration-150;
 }
 
-/* Inputs y selects */
-input[type="text"],
-input[type="date"],
-input[type="number"],
-input[type="search"],
-select,
-textarea {
-  @apply bg-[#2A2A3D] border border-[#3A3A4F] text-white placeholder-gray-400 rounded px-3 py-2 w-full;
-}
-
-/* Botones dentro de filtros o formularios */
-button.bg-blue-500,
-button.bg-black,
-button.bg-gray-300,
-button.bg-yellow-300,
-button.bg-red-500 {
-  @apply rounded-lg text-white px-4 py-2;
-}
-
-button.bg-blue-500:hover {
-  @apply bg-blue-600;
-}
-
-button.bg-black:hover {
-  @apply bg-gray-800;
-}
-
-button.bg-gray-300 {
-  @apply bg-[#3A3A4F];
-}
-
-button.bg-gray-300:hover {
-  @apply bg-[#4A4A5F];
-}
-
-button.bg-yellow-300 {
-  @apply text-black;
-}
-
-button.bg-yellow-300:hover {
-  @apply bg-yellow-400;
-}
-
-button.bg-red-500:hover {
-  @apply bg-red-600;
-}
-
-/* Cards / Paneles */
-.card-dark {
-  @apply bg-[#2A2A3D] p-6 rounded-2xl shadow-lg shadow-black/20;
-}
-
-/* Tabla */
+/* Estilo para tablas */
 table {
-  @apply w-full border border-[#3A3A4F] text-sm;
+  @apply w-full border-collapse;
 }
 
-thead {
-  @apply bg-[#1E1E2F] text-gray-300;
+th, td {
+  @apply px-4 py-2;
 }
 
-thead th {
-  @apply p-3 text-left border-b border-[#3A3A4F];
-}
-
-tbody td {
-  @apply p-3 border-t border-[#3A3A4F];
-}
-
-tbody tr:hover {
-  @apply bg-[#262637];
-}
-
-/* Badges de estado */
-.badge-vigente {
-  @apply bg-green-500/20 text-green-300 px-2 py-1 rounded-full text-sm;
-}
-
-.badge-por_vencer {
-  @apply bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded-full text-sm;
-}
-
-.badge-vencido {
-  @apply bg-red-500/20 text-red-300 px-2 py-1 rounded-full text-sm;
-}
-
-/* Placeholder en inputs */
-::placeholder {
-  @apply text-gray-400;
-}
-
-/* Scrollbar opcional */
+/* Scrollbar minimal */
 ::-webkit-scrollbar {
   width: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: #3A3A4F;
-  border-radius: 4px;
+  background: #444;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Estilo oscuro para react-calendar */
-.react-calendar {
-  @apply bg-[#2A2A3D] text-white rounded-2xl p-4 shadow-lg;
-  border: none;
+/* Calendario react-day-picker personalizado */
+.rdp {
+  background-color: black;
+  color: white;
+  border-radius: 1rem;
+  padding: 1rem;
 }
 
-.react-calendar__navigation button {
-  @apply text-white hover:bg-[#3A3A4F] rounded;
+.rdp-day {
+  @apply hover:bg-neutral-800 transition duration-150;
 }
 
-.react-calendar__month-view__weekdays {
-  @apply text-gray-400;
+.rdp-day_selected {
+  @apply bg-blue-600 text-white;
 }
 
-.react-calendar__tile {
-  @apply bg-transparent text-white rounded hover:bg-[#3A3A4F];
+.rdp-caption {
+  color: white;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
 }
-
-.react-calendar__tile--now {
-  @apply bg-blue-600 text-white rounded;
-}
-
-.react-calendar__tile--active {
-  @apply bg-blue-500 text-white;
-}
-
-
