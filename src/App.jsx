@@ -19,42 +19,25 @@ import "react-calendar/dist/Calendar.css";
 import "./App.css";
 
 function App() {
-  // Estado de autenticación
   const [user, setUser] = useState(null);
-
-  // Lista de artículos
   const [articulos, setArticulos] = useState([]);
-
-  // ID de artículo en edición
   const [editId, setEditId] = useState(null);
-
-  // Filtro de estado y búsqueda
   const [filtro, setFiltro] = useState("todos");
   const [busqueda, setBusqueda] = useState("");
-
-  // Formulario de artículo
   const [form, setForm] = useState({
     nombre: "",
     fechaIngreso: "",
     fechaVencimiento: "",
     avisoDias: 0,
   });
-
-  // Calendario
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date());
 
-  // Fecha de hoy para cálculo de estado
   const hoy = dayjs().startOf("day");
 
-  // Observador de auth
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
-    return () => unsubscribe();
+    onAuthStateChanged(auth, (u) => setUser(u));
   }, []);
 
-  // Sincronización en tiempo real de artículos
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "articulos"), (snap) => {
       setArticulos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
@@ -62,36 +45,35 @@ function App() {
     return () => unsub();
   }, []);
 
-  // Login / Logout
   const login = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
-  // Determina estado del artículo según fecha y aviso
-  const estadoArticulo = (vencimiento, avisoDias) => {
-    const v = dayjs(vencimiento);
+  const estadoArticulo = (venc, aviso) => {
+    const v = dayjs(venc);
     if (hoy.isAfter(v)) return "vencido";
-    if (hoy.add(avisoDias, "day").isAfter(v)) return "por_vencer";
+    if (hoy.add(aviso, "day").isAfter(v)) return "por_vencer";
     return "vigente";
   };
 
-  // Textos y estilos para badges
   const textoEstado = {
     vigente: "Vigente ✅",
     por_vencer: "Por vencer ⚠️",
     vencido: "Vencido ❌",
   };
+
   const badgeEstado = {
     vigente: "bg-green-600 text-white",
     por_vencer: "bg-yellow-500 text-black",
     vencido: "bg-red-600 text-white",
   };
 
-  // Añadir o actualizar artículo
   const handleAddOrEdit = async () => {
     if (!form.nombre || !form.fechaIngreso || !form.fechaVencimiento) return;
     const data = {
       ...form,
-      autor: user.displayName || user.email,
+      autor: {
+        nombre: user.displayName || user.email,
+      },
     };
     if (editId) {
       await updateDoc(doc(db, "articulos", editId), data);
@@ -102,14 +84,12 @@ function App() {
     setForm({ nombre: "", fechaIngreso: "", fechaVencimiento: "", avisoDias: 0 });
   };
 
-  // Eliminar artículo
   const handleDelete = async (id) => {
     if (confirm("¿Eliminar artículo?")) {
       await deleteDoc(doc(db, "articulos", id));
     }
   };
 
-  // Cargar datos al editar
   const handleEdit = (a) => {
     setEditId(a.id);
     setForm({
@@ -120,15 +100,14 @@ function App() {
     });
   };
 
-  // Filtrado por estado y búsqueda
   const filtrados = articulos.filter((a) => {
     const est = estadoArticulo(a.fechaVencimiento, a.avisoDias);
-    const matchFiltro = filtro === "todos" || filtro === est;
-    const matchBusqueda = a.nombre.toLowerCase().includes(busqueda.toLowerCase());
-    return matchFiltro && matchBusqueda;
+    return (
+      (filtro === "todos" || filtro === est) &&
+      a.nombre.toLowerCase().includes(busqueda.toLowerCase())
+    );
   });
 
-  // Si no está autenticado, mostrar login
   if (!user) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#282c34] text-white">
@@ -143,7 +122,6 @@ function App() {
     );
   }
 
-  // Render principal
   return (
     <div className="min-h-screen bg-[#282c34] text-white p-6 space-y-6">
       {/* Header */}
@@ -170,7 +148,7 @@ function App() {
             onClick={() => setFiltro(f.val)}
             className={`px-4 py-1 rounded-full border ${
               filtro === f.val
-                ? badgeEstado[estadoArticulo("2025-01-01", 0)].replace(/bg-[^ ]+/, "") + ` bg-${f.val}-600 text-white`
+                ? `bg-blue-600 border-blue-600 text-white`
                 : "bg-[#3a3a3f] border-gray-600 text-gray-300 hover:bg-[#2a2a2a]"
             }`}
           >
@@ -193,8 +171,8 @@ function App() {
       {/* Formulario + Calendario */}
       <div className="flex flex-col md:flex-row gap-6">
         {/* Formulario */}
-        <div className="flex-1 bg-[#3a3a3f] p-6 rounded-xl shadow-lg space-y-4">
-          <h2 className="text-xl font-semibold">
+        <div className="flex-1 bg-[#3a3a3f] p-6 rounded-xl shadow-lg">
+          <h2 className="text-xl font-semibold mb-4">
             {editId ? "Editar artículo" : "Nuevo artículo"}
           </h2>
           <input
@@ -202,13 +180,15 @@ function App() {
             placeholder="Nombre"
             value={form.nombre}
             onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-            className="w-full p-2 bg-[#2a2a2a] rounded border border-gray-600"
+            className="w-full mb-3 p-2 bg-[#2a2a2a] rounded border border-gray-600"
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <input
               type="date"
               value={form.fechaIngreso}
-              onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, fechaIngreso: e.target.value })
+              }
               className="p-2 bg-[#2a2a2a] rounded border border-gray-600"
             />
             <input
@@ -227,7 +207,7 @@ function App() {
             onChange={(e) =>
               setForm({ ...form, avisoDias: Number(e.target.value) })
             }
-            className="w-full p-2 bg-[#2a2a2a] rounded border border-gray-600"
+            className="w-full mb-4 p-2 bg-[#2a2a2a] rounded border border-gray-600"
           />
           <button
             onClick={handleAddOrEdit}
@@ -247,7 +227,7 @@ function App() {
         </div>
       </div>
 
-      {/* Tabla de artículos */}
+      {/* Tabla */}
       <div className="overflow-x-auto bg-[#3a3a3f] rounded-xl shadow-lg">
         <table className="w-full text-left">
           <thead className="bg-[#2a2a2a] text-gray-300">
@@ -275,7 +255,7 @@ function App() {
                       {textoEstado[est]}
                     </span>
                   </td>
-                  <td className="p-3">{a.autor}</td>
+                  <td className="p-3">{a.autor.nombre}</td>
                   <td className="p-3 space-x-2">
                     <button
                       onClick={() => handleEdit(a)}
