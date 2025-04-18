@@ -1,169 +1,180 @@
-import React, { useState, useEffect } from "react";
-import Calendar from "react-calendar";
-import dayjs from "dayjs";
+import { useEffect, useState } from "react";
 import {
   collection,
+  onSnapshot,
   addDoc,
   updateDoc,
   deleteDoc,
   doc,
-  onSnapshot,
+  Timestamp,
+  query,
+  orderBy,
 } from "firebase/firestore";
-import { auth, provider, db } from "./firebase";
-import {
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-} from "firebase/auth";
+import { db, auth } from "./firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-import "./App.css";
 
 function App() {
-  const [user, setUser] = useState(null);
   const [articulos, setArticulos] = useState([]);
-  const [editId, setEditId] = useState(null);
-  const [filtro, setFiltro] = useState("todos");
-  const [busqueda, setBusqueda] = useState("");
-
-  const [form, setForm] = useState({
+  const [nuevoArticulo, setNuevoArticulo] = useState({
     nombre: "",
     fechaIngreso: "",
     fechaVencimiento: "",
-    avisoDias: 0,
+    avisoDias: 30,
   });
-
-  const hoy = dayjs().startOf("day");
+  const [usuario, setUsuario] = useState(null);
+  const [editando, setEditando] = useState(null);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtro, setFiltro] = useState("todos");
+  const [value, onChange] = useState(new Date());
 
   useEffect(() => {
-    onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setUsuario(user);
+        const q = query(collection(db, "articulos"), orderBy("fechaVencimiento"));
+        onSnapshot(q, (snapshot) => {
+          setArticulos(
+            snapshot.docs.map((doc) => ({
+              ...doc.data(),
+              id: doc.id,
+            }))
+          );
+        });
+      } else {
+        setUsuario(null);
+      }
     });
   }, []);
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, "articulos"), (snapshot) => {
-      const docs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setArticulos(docs);
+  const agregarArticulo = async () => {
+    if (
+      !nuevoArticulo.nombre ||
+      !nuevoArticulo.fechaIngreso ||
+      !nuevoArticulo.fechaVencimiento
+    )
+      return;
+    await addDoc(collection(db, "articulos"), {
+      ...nuevoArticulo,
+      avisoDias: parseInt(nuevoArticulo.avisoDias),
+      autor: { uid: usuario.uid, nombre: usuario.email },
+      creado: Timestamp.now(),
     });
-    return unsub;
-  }, []);
-
-  const login = () => signInWithPopup(auth, provider);
-  const logout = () => signOut(auth);
-
-  const estadoArticulo = (vencimiento, avisoDias) => {
-    const fechaVenc = dayjs(vencimiento);
-    if (hoy.isAfter(fechaVenc)) return "vencido";
-    if (hoy.add(avisoDias, "day").isAfter(fechaVenc)) return "por_vencer";
-    return "vigente";
+    setNuevoArticulo({ nombre: "", fechaIngreso: "", fechaVencimiento: "", avisoDias: 30 });
   };
 
-  const textoEstado = {
-    vigente: "Vigente ✅",
-    por_vencer: "Por vencer ⚠️",
-    vencido: "Vencido ❌",
-  };
-
-  const badgeEstado = {
-    vigente: "bg-green-600 text-white",
-    por_vencer: "bg-yellow-500 text-black",
-    vencido: "bg-red-600 text-white",
-  };
-
-  const handleAddOrEdit = async () => {
-    if (!form.nombre || !form.fechaIngreso || !form.fechaVencimiento) return;
-
-    const data = {
-      ...form,
-      autor: {
-        nombre: user.displayName,
-        email: user.email,
-        uid: user.uid,
-      },
-    };
-
-    if (editId) {
-      const ref = doc(db, "articulos", editId);
-      await updateDoc(ref, data);
-      setEditId(null);
-    } else {
-      await addDoc(collection(db, "articulos"), data);
-    }
-
-    setForm({
-      nombre: "",
-      fechaIngreso: "",
-      fechaVencimiento: "",
-      avisoDias: 0,
+  const handleEdit = (articulo) => {
+    setEditando(articulo);
+    setNuevoArticulo({
+      nombre: articulo.nombre,
+      fechaIngreso: articulo.fechaIngreso,
+      fechaVencimiento: articulo.fechaVencimiento,
+      avisoDias: articulo.avisoDias,
     });
+  };
+
+  const guardarEdicion = async () => {
+    await updateDoc(doc(db, "articulos", editando.id), nuevoArticulo);
+    setEditando(null);
+    setNuevoArticulo({ nombre: "", fechaIngreso: "", fechaVencimiento: "", avisoDias: 30 });
   };
 
   const handleDelete = async (id) => {
-    if (confirm("¿Eliminar artículo?")) {
-      await deleteDoc(doc(db, "articulos", id));
-    }
+    await deleteDoc(doc(db, "articulos", id));
   };
 
-  const handleEdit = (a) => {
-    setForm({
-      nombre: a.nombre,
-      fechaIngreso: a.fechaIngreso,
-      fechaVencimiento: a.fechaVencimiento,
-      avisoDias: a.avisoDias,
+  const logout = () => {
+    signOut(auth);
+  };
+
+  const estadoArticulo = (fechaVencimiento, avisoDias) => {
+    const hoy = new Date();
+    const fechaVen = new Date(fechaVencimiento);
+    const diff = (fechaVen - hoy) / (1000 * 60 * 60 * 24);
+    if (diff < 0) return "vencido";
+    if (diff <= avisoDias) return "por_vencer";
+    return "vigente";
+  };
+
+  const badgeEstado = {
+    vigente: "bg-green-800 text-white",
+    por_vencer: "bg-yellow-600 text-black",
+    vencido: "bg-red-800 text-white",
+  };
+
+  const textoEstado = {
+    vigente: "Vigente",
+    por_vencer: "Por vencer",
+    vencido: "Vencido",
+  };
+
+  const filtrados = articulos
+    .filter((a) => a.nombre.toLowerCase().includes(busqueda.toLowerCase()))
+    .filter((a) => {
+      if (filtro === "todos") return true;
+      return estadoArticulo(a.fechaVencimiento, a.avisoDias) === filtro;
     });
-    setEditId(a.id);
-  };
-
-  const filtrados = articulos.filter((a) => {
-    const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
-    const coincideBusqueda = a.nombre
-      .toLowerCase()
-      .includes(busqueda.toLowerCase());
-    return (
-      (filtro === "todos" || filtro === estado) && coincideBusqueda
-    );
-  });
 
   const totalStats = {
-    vigente: 0,
-    por_vencer: 0,
-    vencido: 0,
+    vigente: articulos.filter((a) => estadoArticulo(a.fechaVencimiento, a.avisoDias) === "vigente").length,
+    por_vencer: articulos.filter((a) => estadoArticulo(a.fechaVencimiento, a.avisoDias) === "por_vencer").length,
+    vencido: articulos.filter((a) => estadoArticulo(a.fechaVencimiento, a.avisoDias) === "vencido").length,
   };
 
-  articulos.forEach((a) => {
-    const estado = estadoArticulo(a.fechaVencimiento, a.avisoDias);
-    totalStats[estado]++;
-  });
-
-  if (!user) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#1E1E2F] text-center text-white">
-        <h1 className="text-3xl font-bold mb-4">Marra Distribuciones</h1>
-        <p className="mb-4 text-gray-400">Iniciá sesión para continuar</p>
-        <button
-          onClick={login}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          Iniciar sesión con Google
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto font-sans text-white">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-2">
+    <div className="p-4 max-w-7xl mx-auto text-white">
+      <h1 className="text-3xl font-bold mb-4">Marra Distribuciones</h1>
+
+      <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-2xl font-bold">MARRA DISTRIBUCIONES</h1>
-          <p className="text-sm text-gray-400">Hola, {user.displayName}</p>
+          <button onClick={logout} className="bg-red-600 px-3 py-1 rounded">
+            Cerrar sesión
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-white"
-        >
-          Cerrar sesión
-        </button>
+        <Calendar onChange={onChange} value={value} className="bg-black text-white rounded-lg p-2 border border-gray-700" />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <input
+          type="text"
+          placeholder="Nombre"
+          className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded"
+          value={nuevoArticulo.nombre}
+          onChange={(e) => setNuevoArticulo({ ...nuevoArticulo, nombre: e.target.value })}
+        />
+        <input
+          type="date"
+          placeholder="Fecha de ingreso"
+          className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded"
+          value={nuevoArticulo.fechaIngreso}
+          onChange={(e) => setNuevoArticulo({ ...nuevoArticulo, fechaIngreso: e.target.value })}
+        />
+        <input
+          type="date"
+          placeholder="Fecha de vencimiento"
+          className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded"
+          value={nuevoArticulo.fechaVencimiento}
+          onChange={(e) => setNuevoArticulo({ ...nuevoArticulo, fechaVencimiento: e.target.value })}
+        />
+        <input
+          type="number"
+          placeholder="Días de aviso"
+          className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded"
+          value={nuevoArticulo.avisoDias}
+          onChange={(e) => setNuevoArticulo({ ...nuevoArticulo, avisoDias: e.target.value })}
+        />
+      </div>
+      <div className="mb-6">
+        {editando ? (
+          <button onClick={guardarEdicion} className="bg-yellow-500 px-4 py-2 rounded mr-2">
+            Guardar cambios
+          </button>
+        ) : (
+          <button onClick={agregarArticulo} className="bg-blue-600 px-4 py-2 rounded">
+            Agregar artículo
+          </button>
+        )}
       </div>
 
       {/* Dashboard */}
@@ -173,79 +184,61 @@ function App() {
         <div className="bg-red-800 text-white p-4 rounded-xl shadow">❌ Vencidos: <strong>{totalStats.vencido}</strong></div>
       </div>
 
-      {/* Filtros y búsqueda */}
+      {/* Filtros personalizados */}
       <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-2">
         <div className="flex gap-2 flex-wrap">
-          {[
-            { label: "Todos", value: "todos" },
-            { label: "Vigentes ✅", value: "vigente" },
-            { label: "Por vencer ⚠️", value: "por_vencer" },
-            { label: "Vencidos ❌", value: "vencido" },
-          ].map((f) => (
-            <button
-              key={f.value}
-              onClick={() => setFiltro(f.value)}
-              className={`px-3 py-1 rounded-full border ${
-                filtro === f.value
-                  ? "bg-blue-500 text-white"
-                  : "bg-[#2A2A3D] text-white border-gray-600 hover:bg-[#3A3A50]"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex flex-col items-end w-full md:w-auto">
-          <label className="text-sm text-gray-400 mb-1">Buscar por nombre</label>
-          <input
-            type="text"
-            placeholder="Ej: Coca Cola..."
-            className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded w-full md:w-64"
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-          />
+          <button
+            onClick={() => setFiltro("todos")}
+            className={`px-4 py-1 rounded-full border ${
+              filtro === "todos"
+                ? "bg-blue-600 text-white"
+                : "bg-[#2A2A3D] text-white border-gray-600 hover:bg-blue-800"
+            }`}
+          >
+            Todos
+          </button>
+          <button
+            onClick={() => setFiltro("vigente")}
+            className={`px-4 py-1 rounded-full border ${
+              filtro === "vigente"
+                ? "bg-green-600 text-white"
+                : "bg-[#2A2A3D] text-white border-gray-600 hover:bg-green-800"
+            }`}
+          >
+            Vigentes ✅
+          </button>
+          <button
+            onClick={() => setFiltro("por_vencer")}
+            className={`px-4 py-1 rounded-full border ${
+              filtro === "por_vencer"
+                ? "bg-yellow-400 text-black"
+                : "bg-[#2A2A3D] text-white border-gray-600 hover:bg-yellow-500"
+            }`}
+          >
+            Por vencer ⚠️
+          </button>
+          <button
+            onClick={() => setFiltro("vencido")}
+            className={`px-4 py-1 rounded-full border ${
+              filtro === "vencido"
+                ? "bg-red-600 text-white"
+                : "bg-[#2A2A3D] text-white border-gray-600 hover:bg-red-700"
+            }`}
+          >
+            Vencidos ❌
+          </button>
         </div>
       </div>
 
-      {/* Formulario */}
-      <div className="border p-6 rounded-2xl shadow bg-[#2A2A3D] mb-6">
-        <h2 className="text-lg font-semibold mb-4">
-          {editId ? "Editar artículo" : "Nuevo artículo"}
-        </h2>
-        <label className="block mb-1">Nombre</label>
+      {/* Buscador de nombre arriba de la tabla */}
+      <div className="flex justify-end mb-4">
         <input
           type="text"
-          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-3 p-2 text-white"
-          value={form.nombre}
-          onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+          placeholder="Buscar por nombre..."
+          className="bg-[#1E1E2F] border border-gray-600 text-white p-2 rounded w-full md:w-64"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
         />
-        <label className="block mb-1">Fecha de ingreso</label>
-        <input
-          type="date"
-          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-3 p-2 text-white"
-          value={form.fechaIngreso}
-          onChange={(e) => setForm({ ...form, fechaIngreso: e.target.value })}
-        />
-        <label className="block mb-1">Fecha de vencimiento</label>
-        <input
-          type="date"
-          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-3 p-2 text-white"
-          value={form.fechaVencimiento}
-          onChange={(e) => setForm({ ...form, fechaVencimiento: e.target.value })}
-        />
-        <label className="block mb-1">Avisar X días antes</label>
-        <input
-          type="number"
-          className="w-full bg-[#1E1E2F] border border-gray-600 rounded mb-4 p-2 text-white"
-          value={form.avisoDias}
-          onChange={(e) => setForm({ ...form, avisoDias: Number(e.target.value) })}
-        />
-        <button
-          onClick={handleAddOrEdit}
-          className="bg-blue-600 hover:bg-blue-700 text-white w-full py-2 rounded-xl transition"
-        >
-          {editId ? "Guardar cambios" : "Agregar artículo"}
-        </button>
       </div>
 
       {/* Tabla */}
@@ -272,15 +265,11 @@ function App() {
                   <td className="p-3">{a.fechaVencimiento}</td>
                   <td className="p-3">{a.avisoDias} días</td>
                   <td className="p-3">
-                    <span
-                      className={`text-sm px-2 py-1 rounded-full ${badgeEstado[estado]}`}
-                    >
+                    <span className={`text-sm px-2 py-1 rounded-full ${badgeEstado[estado]}`}>
                       {textoEstado[estado]}
                     </span>
                   </td>
-                  <td className="p-3 text-sm text-gray-400">
-                    {a.autor?.nombre || "—"}
-                  </td>
+                  <td className="p-3 text-sm text-gray-400">{a.autor?.nombre || "—"}</td>
                   <td className="p-3 space-x-2">
                     <button
                       onClick={() => handleEdit(a)}
